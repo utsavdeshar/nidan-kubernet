@@ -1,0 +1,226 @@
+minikube start -p  my-cluster1    ----to create a cluster where -p  stands for profiles
+
+kubectl cluster-info              --context kind my-cluster1
+kubectl get nodes
+ minikube start -p nidan-cluster --nodes 3 --kubernetes-version=v1.28.3      ---with multiple nodes
+minikube delete --all   delete all cluster
+minikube delete --all --purge  ---  wipe all minikube data and cache
+
+minikube profile list  --  list the node profiles
+
+kubectl config get-contexts  --list cluster nodes with current cluster
+ kubctl config use-context my-cluster2   ---to switch the cluster
+
+
+kubectl run nginx-pod --image=nginx:latest    create pods by imperative method
+kubectl get pods    ---   to list the created pods
+ kubectl explain pod    -- list the kind and version to generate yaml file
+
+kubectl delete pod nginx-pod    ---delete pods
+
+kubectl create/apply -f test.yaml     create pods by yaml file
+
+kubectl describe pod nginx-pod   -- to check detail about pod created
+
+ kubectl edit pod nginx-pod  -- edit pod image directly without editing yaml file during troubleshoot
+
+kubectl exec -it nginx-pod -- sh --ssh with the pods
+
+kubectl run nginx --image=nginx --dry-run=client  --Kubernetes does not create anything. Instead, the command validates your input and prints the resource definition it would have created.
+
+kubectl run nginx --image=nginx --dry-run=client -o yaml   to generate yaml from imperative pods to create the pod from yaml file as command provide the content for yaml
+
+kubectl get pods nginx-pod --show-labels
+
+kubectl get pods -o wide   --display the detail running  pod on node and ip
+ kubectl get nodes -o wide  -- display the detail running nodes
+
+
+Replication controller:   --- legacy version
+kubectl explain rc    --- to check the the replication controller version details
+ content with in rc.yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: nginx-rc
+  labels:
+    env: demo
+spec:
+  template:
+    metadata:
+      labels:
+        env: demo
+      name: nginx
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+  replicas: 3
+
+kubectl get rc -- to check recplica controller
+
+
+##Replica set is the newerversion and preferred one
+kubectl explain rs
+##contains of rs.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-rs
+  labels:
+    env: demo
+spec:
+  template:
+    metadata:
+      labels:
+        env: demo
+      name: nginx
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+  replicas: 5
+  selector:
+    matchLabels:
+      env: demo       --manage the pods matching from the env 
+
+
+kubectl edit rs/nginx-rs   --to edit in live pods
+
+ kubectl scale --replicas=10 rs/nginx-rs    -----imparitive methot to scale the replicas size directly with command
+
+
+
+Deployment: deployment manages the replica set and replica set manages the pod (during the version upgrade there may be the down on live server so to mitigate the downtime the deployment feature play a significant role by managing load balance and upgrading the version of pod one by one)
+kubectl explain deployment
+ ## contain of deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deploy
+  labels:
+    env: demo
+spec:
+  template:
+    metadata:
+      labels:
+        env: demo
+      name: nginx
+    spec:
+      containers:
+      - image: nginx
+        name: nginxkubectl get all
+  replicas: 3
+  selector:
+    matchLabels:
+      env: demo
+
+kubectl apply -f deployment.yaml  ---  to create pods
+kubectl get deploy   --  to check deployment running with pods replicas
+
+kubectl get all   --list all object running in cluster
+
+kubectl set image deploy/nginx-deploy \     ----update nginx version directly in pod image without editing yaml
+> nginx=nginx:1.9.1
+deployment.apps/nginx-deploy image updated 
+
+kubectl describe deployment/nginx-deploy   
+
+kubectl rollout history deploy/nginx-deploy    --checkout rollout history of pod
+deployment.apps/nginx-deploy
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+kubectl rollout undo deploy/nginx-deploy  --to undo the rollout and back to previous version
+
+
+Services: ( To make access available externally to user and internal networking between pods services in kub.)
+   -NodePort: The application is exposed to particular port and exposed externally (30001 port) the redirect request to target port 80
+   - targetport: the port in which application pods are is listen on and not exposed externally (80 port)
+   -service port 80 : Used by internal communication by pods with in the nodes 
+
+kubeclt explain service
+## contain of nodeport.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodeport-svc
+  labels:
+    env: demo
+spec:
+  type: NodePort
+  ports:
+  - nodePort: 30001
+    port: 80
+    targetPort: 80
+  selector:
+    env: demo
+kubectl get pods --show-labels   for section selector to specify label
+
+kubectl create -f nodeport.yaml
+kubectl get services/svc
+
+
+
+
+Service :ClusterIP  To communicate between the pods 
+kubectl get service/svc
+##contain of clusterip.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-svc
+  labels:
+    env: demo
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    env: demo
+kubectl get svc
+
+kubectl describe svc/cluster-svc
+
+Endpoints:  Ip of pods on which the service is listen to.
+kubectl get endpoints/ep
+
+
+Loadbalancer: 
+##content of loadbalance lb.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb-svc
+  labels:
+    env: demo
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    env: demo
+kubectl create -f lb.yaml
+kubectl get svc
+
+
+
+kubectl label node nidan-cluster-m02 gateway=true  -- to create list in nodes
+
+kubectl get nodes --show-labels | grep gateway  --list the node with label gateway
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+

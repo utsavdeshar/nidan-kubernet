@@ -1,0 +1,110 @@
+OPEnelis Issue with Solution:
+
+cd ~/nidan/nidan-docker/openelis
+
+kubectl -n nidan create configmap openelis-config-files \
+  --from-file=server.xml=tomcat/server.xml \
+  --from-file=common.properties=volume/properties/common.properties \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+for pair in \
+  "configuration:volume/configuration" \
+  "branding:volume/branding" \
+  "plugins:volume/plugins" \
+  "ocl:volume/ocl" \
+  "analyzer:volume/analyzer" \
+  "odoo:volume/odoo"
+do
+  name="openelis-${pair%%:*}"
+  dir="${pair#*:}"
+  if [ -n "$(find "$dir" -type f -print -quit 2>/dev/null)" ]; then
+    kubectl -n nidan create configmap "$name" \
+      --from-file="$dir" \
+      --dry-run=client -o yaml | kubectl apply -f -
+  fi
+done
+
+if [ -n "$(find volume/certs -type f -print -quit 2>/dev/null)" ]; then
+  kubectl -n nidan create secret generic openelis-certs \
+    --from-file=volume/certs \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
+
+
+---
+
+Before restoring, see what's there now:
+
+kubectl -n nidan get pods -l app=openelis-db
+kubectl -n nidan get pvc | grep openelis-db
+
+Stop OpenELIS (so nothing writes during restore):
+
+kubectl -n nidan scale deploy openelis --replicas=0
+kubectl -n nidan get pods -l app=openelis
+
+
+Restore from your openelis.sql dump:
+cd /home/kubernet/nidan
+ls -lh openelis.sql
+
+# Reset the schema to a clean slate
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -c "DROP SCHEMA IF EXISTS clinlims CASCADE;"
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -c "CREATE SCHEMA clinlims AUTHORIZATION clinlims;"
+
+# Ensure search_path so unqualified names land in clinlims
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -c "ALTER DATABASE clinlims SET search_path TO clinlims, public;"
+
+# Copy the dump into the DB pod
+kubectl -n nidan cp openelis.sql openelis-db-0:/tmp/openelis.sql
+kubectl -n nidan exec openelis-db-0 -- ls -lh /tmp/openelis.sql
+
+------
+Load it. Use clinlims, not postgres — the K8s DB container only has clinlims:
+
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -f /tmp/openelis.sql 2>&1 | tee /tmp/load.log | tail -40
+
+--------
+If the dump has CREATE DATABASE lines and errors on permission, filter them out first:
+
+
+grep -v '^CREATE DATABASE' openelis.sql > /tmp/openelis-nodb.sql
+kubectl -n nidan cp /tmp/openelis-nodb.sql openelis-db-0:/tmp/openelis.sql
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -f /tmp/openelis.sql 2>&1 | tail -40
+
+
+
+---Verify the restore:
+
+# Table count — should be ~291
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -c "
+    SELECT count(*) FROM information_schema.tables WHERE table_schema='clinlims';
+  "
+
+# Key tables exist
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -c '\dt clinlims.login_user clinlims.system_user clinlims.databasechangelog'
+
+# Changelog populated (this is what stops Liquibase from failing)
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -c "SELECT count(*) FROM clinlims.databasechangelog;"
+
+# Some reference data
+kubectl -n nidan exec openelis-db-0 -- \
+  psql -U clinlims -d clinlims -c "SELECT count(*) FROM clinlims.system_user;"
+
+
+Restart OpenELIS:
+
+kubectl -n nidan scale deploy openelis --replicas=1
+kubectl -n nidan get pods -l app=openelis -w
+
+---
+Watch Log:
+kubectl -n nidan logs -f deploy/openelis -c openelis | grep -iE 'liquibase|changeset|startup|SEVERE'

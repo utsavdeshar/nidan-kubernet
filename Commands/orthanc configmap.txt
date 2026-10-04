@@ -1,0 +1,13 @@
+cd /home/kubernet/nidan/nidan-docker/orthanc
+# edit orthanc.json or webhook.lua
+nano orthanc.json
+
+# Push the new ConfigMap
+kubectl create configmap orthanc-config-files -n nidan \
+  --from-file=orthanc.json=orthanc.json \
+  --from-file=webhook.lua=webhook.lua \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Restart Orthanc to pick up the changes
+kubectl rollout restart deployment/orthanc -n nidan
+kubectl rollout status deployment/orthanc -n nidan

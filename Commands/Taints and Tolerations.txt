@@ -1,0 +1,61 @@
+Taints and Tolerations:
+kubectl get nodes
+kubectl taint node nidan-cluseter gpu=true:NoSchedule  --applying taint to nodes so that during create of pods only pods created with taint
+kubectl describe node nidan-cluster-m02 | grep -i taint   --to check taint on nodes
+
+kubectl run nginx --image=nginx   --During the pod creating it will go to pending as all node is on taint
+kubectl describe pod nginx    ---to check deatil and pending issue on pod
+
+
+kubectl run redis --image=redis --dry-run=client -o yaml > radis.yaml  --to generate yaml file 
+#content
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: redis
+  name: redis
+spec:
+  containers:
+  - image: redis
+    name: redis
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+  tolerations:
+  - key: "gpu"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+status: {}  
+
+kubectl apply -f redis.yaml   ----now it will create redis pod with status running
+
+
+## Run pod to specific worker with nodeselector
+ kubectl run nginx-new --image=nginx --dry-run=client -o yaml > newnginx.yaml   --generate yaml
+##content       --with gup false condition
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: nginx-new
+  name: nginx-new
+spec:
+  containers:
+  - image: nginx
+    name: nginx-new
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+  nodeSelector:
+    gpu: "false"
+status: {}
+
+kubectl label node nidan-cluster-m03 gpu=false   ----label the node cluster with gpu false
+
+kubectl apply -f newnginx.yaml   --- to create a pod
+kubectl describe pod nginx-new    --- status with pod with node worker
+kubeclt describe node nidan-cluster-m03   -- status of node worker
+
+

@@ -1,0 +1,61 @@
+sudo apt install socat  --- install package
+
+/etc/systemd/system   -- path
+nidan-gateway-forward.service --file
+
+[Unit]
+Description=Minikube WordPress Tunnel
+After=network.target
+
+[Service]
+Type=simple
+User=kubernet
+ExecStart=/usr/local/bin/minikube service wordpress --url
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+kubernet@kubernet:/etc/systemd/system$ pwd
+/etc/systemd/system
+kubernet@kubernet:/etc/systemd/system$ cat nidan-gateway-forward.service
+[Unit]
+Description=Nidan Gateway HTTPS Forwarder
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nidan-gateway-forward.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat /usr/local/bin/nidan-gateway-forward.sh
+#!/bin/bash
+set -e
+
+PROFILE="nidan-cluster"
+LAN_IP="192.168.1.100"
+MINIKUBE_IP=$(sudo -u kubernet minikube -p "$PROFILE" ip)
+
+echo "Minikube IP: $MINIKUBE_IP"
+
+socat "TCP-LISTEN:443,bind=${LAN_IP},reuseaddr,fork"  "TCP:${MINIKUBE_IP}:30443" &
+socat "TCP-LISTEN:80,bind=${LAN_IP},reuseaddr,fork"   "TCP:${MINIKUBE_IP}:30080" &
+socat "TCP-LISTEN:8069,bind=${LAN_IP},reuseaddr,fork" "TCP:${MINIKUBE_IP}:30069" &
+
+wait
+
+sudo chmod +x /usr/local/bin/nidan-gateway-forward.sh   -- privileges
+
+
+
+
+sudo systemctl daemon-reload
+sudo systemctl restart nidan-gateway-forward.service
+sudo systemctl status  nidan-gateway-forward.service
+sudo journalctl -u nidan-gateway-forward.service -f

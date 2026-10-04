@@ -1,0 +1,31 @@
+If two replica on odoo frequently logout on browser refresh :
+Solution:
+Service — added:
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800   # 3 hours
+
+odoo-nodeport Service — added the same:
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800   # 3 hours
+
+
+kubectl apply -f odoo.yaml -n nidan
+
+Verify the affinity took effect:
+kubectl get svc odoo -n nidan -o jsonpath='{.spec.sessionAffinity}{"\n"}'
+kubectl get svc odoo-nodeport -n nidan -o jsonpath='{.spec.sessionAffinity}{"\n"}'
+
+Quick sanity check after applying:
+# Confirm pods are still healthy
+kubectl get pods -n nidan -l app=odoo
+
+# Confirm services now have sessionAffinity
+kubectl get svc odoo odoo-nodeport -n nidan -o custom-columns=\
+NAME:.metadata.name,AFFINITY:.spec.sessionAffinity,PORT:.spec.ports[0].port
+
+If both show ClientIP, you're done. Test in the browser — refresh several times and you should stay logged in.
+

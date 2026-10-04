@@ -1,0 +1,39 @@
+sudo ufw status
+[sudo] password for kubernet:
+Status: active
+
+To                         Action      From
+--                         ------      ----
+30080/tcp                  ALLOW       Anywhere
+22/tcp                     ALLOW       Anywhere
+30443/tcp                  ALLOW       Anywhere
+80                         ALLOW       Anywhere
+443                        ALLOW       Anywhere
+8069                       ALLOW       Anywhere
+30080/tcp (v6)             ALLOW       Anywhere (v6)
+22/tcp (v6)                ALLOW       Anywhere (v6)
+30443/tcp (v6)             ALLOW       Anywhere (v6)
+80 (v6)                    ALLOW       Anywhere (v6)
+443 (v6)                   ALLOW       Anywhere (v6)
+8069 (v6)                  ALLOW       Anywhere (v6)
+
+kubectl rollout restart deployment odoo -n nidan  ---restart pod
+
+
+# Scale down
+kubectl scale deployment odoo -n nidan --replicas=0
+
+# Wait 20s for pods to clear
+sleep 20
+
+# Force-delete any stragglers
+kubectl get pods -n nidan --no-headers | grep -E '^odoo-' | grep -v '^odoo-db-0' | awk '{print $1}' | xargs -r kubectl delete pod -n nidan --force --grace-period=0
+
+# Clean stale ReplicaSets
+kubectl get rs -n nidan -l app=odoo --no-headers | awk '$2==0 && $3==0 {print $1}' | xargs -r kubectl delete rs -n nidan
+
+# Scale back up
+kubectl scale deployment odoo -n nidan --replicas=2
+
+# Watch
+kubectl get pods -n nidan -l app=odoo -w
