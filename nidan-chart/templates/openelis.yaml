@@ -1,19 +1,4 @@
-# ============================================================
-# OpenELIS + NIDAN Integration — Kubernetes manifest (v2)
-# Namespace: nidan
-# ------------------------------------------------------------
-# Fixes vs. previous version:
-#   1. CRITICAL: /var/lib/openelis-global is now a single PVC
-#      (not 7 read-only ConfigMaps). OpenELIS writes to
-#      configuration/backend/tests-checksums.properties and
-#      other runtime files under this tree; read-only mounts
-#      cause "No such file or directory" errors on first boot.
-#   2. ConfigMap/Secret mounts removed from /var/lib/openelis-global/*.
-#      You populate the PVC once with `kubectl cp` after the pod
-#      starts (see instructions below the YAML).
-#   3. All other fixes from v1 preserved (DB superuser, probes).
-# ============================================================
-
+{{- if .Values.openelis.enabled }}
 # ------------------------------------------------------------
 # 1. ConfigMap — non-secret environment values
 # ------------------------------------------------------------
@@ -21,7 +6,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: openelis-config
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 data:
   OPENELIS_DB_NAME: "clinlims"
   OPENELIS_DB_USER: "clinlims"
@@ -48,7 +33,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: openelis-secret
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 type: Opaque
 stringData:
   OPENELIS_DB_PASSWORD: "clinlims"
@@ -62,7 +47,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: openelis-db
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 spec:
   type: ClusterIP
   selector:
@@ -80,10 +65,10 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: openelis-db
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 spec:
   serviceName: openelis-db
-  replicas: 1
+  replicas: {{ .Values.openelis.db.replicas }}
   selector:
     matchLabels:
       app: openelis-db
@@ -94,7 +79,7 @@ spec:
     spec:
       containers:
         - name: openelis-db
-          image: trigonaltechnology/openelis-global-2-database:latest
+          image: "{{ .Values.openelis.db.image.repository }}:{{ .Values.openelis.db.image.tag }}"
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres
@@ -140,8 +125,8 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 5
           resources:
-            requests: { cpu: "500m", memory: "1Gi" }
-            limits:   { cpu: "2",    memory: "3Gi" }
+            requests: { cpu: "500m", memory: "256Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
           volumeMounts:
             - name: openelis-db-data
               mountPath: /var/lib/postgresql/data
@@ -162,7 +147,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: openelis
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 spec:
   type: ClusterIP
   selector:
@@ -180,9 +165,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: openelis
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.openelis.backend.replicas }}
   selector:
     matchLabels:
       app: openelis
@@ -192,7 +177,7 @@ spec:
         app: openelis
     spec:
       securityContext:
-        fsGroup: 1000            # tomcat group
+        fsGroup: 8444
         fsGroupChangePolicy: "OnRootMismatch"
 
       initContainers:
@@ -252,8 +237,6 @@ spec:
                 -c "GRANT ALL ON SCHEMA clinlims TO clinlims;"
               echo "Schema clinlims is ready."
 
-        # Ensure the /var/lib/openelis-global directories exist
-        # and are writable by the tomcat user.
         - name: prep-openelis-volume
           image: busybox:1.36
           imagePullPolicy: IfNotPresent
@@ -262,10 +245,15 @@ spec:
             - -c
             - |
               echo "Preparing /var/lib/openelis-global..."
-              for dir in analyzer branding certs configuration ocl odoo plugins properties logs; do
+              for dir in \
+                analyzer branding certs \
+                configuration configuration/backend configuration/frontend \
+                ocl odoo plugins properties logs; do
                 mkdir -p "/var/lib/openelis-global/$dir"
-                chown -R 1000:0 "/var/lib/openelis-global/$dir"
+                chown -R 8443:8444 "/var/lib/openelis-global/$dir"
                 chmod -R u+rwX,g+rwX "/var/lib/openelis-global/$dir"
+                chown 8443:8444 /var/lib/openelis-global
+                chmod 775 /var/lib/openelis-global
               done
               echo "Prepared."
           securityContext:
@@ -276,8 +264,12 @@ spec:
 
       containers:
         - name: openelis
-          image: trigonaltechnology/openelis-global-2:latest
+          image: "{{ .Values.openelis.backend.image.repository }}:{{ .Values.openelis.backend.image.tag }}"
           imagePullPolicy: IfNotPresent
+          securityContext:
+              runAsUser: 8443
+              runAsGroup: 8444
+          command: ["/usr/local/tomcat/bin/catalina.sh", "run"]
           ports:
             - name: http
               containerPort: 8080
@@ -362,17 +354,13 @@ spec:
             timeoutSeconds: 10
             failureThreshold: 5
           resources:
-            requests: { cpu: "500m", memory: "1Gi" }
-            limits:   { cpu: "2",    memory: "3Gi" }
+            requests: { cpu: "200m", memory: "256Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
           volumeMounts:
-            # Static config — kept as ConfigMap mounts (read-only, fine)
             - { name: openelis-server-xml,   mountPath: /usr/local/tomcat/conf/server.xml, subPath: server.xml,        readOnly: true }
             - { name: openelis-common-props, mountPath: /run/secrets/common.properties,   subPath: common.properties, readOnly: true }
-            # Writable volume for the whole openelis-global tree
             - { name: openelis-volume,       mountPath: /var/lib/openelis-global }
-            # Certs (read-only from Secret)
             - { name: openelis-certs,        mountPath: /etc/openelis-global, readOnly: true }
-            # Tomcat logs and Lucene index
             - { name: openelis-tomcat-logs,  mountPath: /usr/local/tomcat/logs }
             - { name: openelis-lucene-index, mountPath: /var/lib/lucene_index }
 
@@ -397,13 +385,13 @@ spec:
 
 ---
 # ------------------------------------------------------------
-# 7. PVC — openelis-volume (writable tree for OpenELIS runtime)
+# 7. PVC — openelis-volume
 # ------------------------------------------------------------
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: openelis-volume
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 spec:
   accessModes: ["ReadWriteOnce"]
   resources:
@@ -418,7 +406,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: openelis-frontend
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 spec:
   type: ClusterIP
   selector:
@@ -436,9 +424,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: openelis-frontend
-  namespace: nidan
+  namespace: {{ include "nidan.namespace" . }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.openelis.frontend.replicas }}
   selector:
     matchLabels:
       app: openelis-frontend
@@ -449,7 +437,7 @@ spec:
     spec:
       containers:
         - name: openelis-frontend
-          image: trigonaltechnology/openelis-global-2-frontend:latest
+          image: "{{ .Values.openelis.frontend.image.repository }}:{{ .Values.openelis.frontend.image.tag }}"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -474,3 +462,4 @@ spec:
           resources:
             requests: { cpu: "100m", memory: "128Mi" }
             limits:   { cpu: "500m", memory: "512Mi" }
+{{- end }}

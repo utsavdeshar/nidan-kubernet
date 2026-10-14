@@ -16,9 +16,6 @@ spec:
         app: gateway
 
     spec:
-      nodeSelector:
-        gateway: "true"
-
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -29,7 +26,7 @@ spec:
 
       containers:
         - name: gateway
-          image: gateway:latest
+          image: niadan-gateway:latest
           imagePullPolicy: IfNotPresent
 
           ports:
@@ -56,7 +53,7 @@ spec:
               value: "/api/OpenELIS-Global/"
 
             - name: DASHBOARD_ODOO_URL
-              value: "http://localhost:8069"
+              value: "http://192.168.1.72:8069"
 
           readinessProbe:
             httpGet:
