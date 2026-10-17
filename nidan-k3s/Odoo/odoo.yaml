@@ -32,7 +32,7 @@ data:
   ODOO_WEB_BASE_URL: ""
   ODOO_WEB_BASE_URL_FREEZE: "True"
   ODOO_DB_FILTER: "^nidan$"
-  NIDAN_OIS_URL: "http://nidan-cis:8081"
+  NIDAN_OIS_URL: "http://nidan-ois:8082"
   NIDAN_OIS_SECRET: "sample"
   NIDAN_ODOO_SECRET: "sample"
 
