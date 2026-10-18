@@ -130,8 +130,6 @@ curl -sfL https://get.k3s.io | sudo env \
   --node-name nindan-k3-worker \
   --node-ip 192.168.1.72
 
-
-
 ```
 
 Replace `<PASTE_NODE_TOKEN_HERE>` with the token retrieved from the server. Do not type the angle brackets literally.
@@ -201,9 +199,10 @@ nidan-kubernet/
 ```bash
 cd proxy-nginx/
 docker build -t nidan-gateway:latest .
-
+```
 Step to load locally build image to k3s:
 
+```bash
 docker save nidan-proxy:latest -o /tmp/nidan-proxy.tar
 sudo k3s ctr -n k8s.io images import /tmp/nidan-proxy.tar
 
@@ -217,7 +216,7 @@ sudo k3s crictl rmi <IMAGE_ID>
 **Disable Ingress** As we are using our own gateway image so need to disable ingress
 
 ```bash
-cd /etc/rancher/k3s/config.yaml
+vi /etc/rancher/k3s/config.yaml
 disable:
   - traefik
 kube-apiserver-arg:
@@ -226,8 +225,8 @@ kube-apiserver-arg:
 ```
 **PODS Deployment** For the deployment of pods with in NidanEHR Namespace a folder nidan-k3s contain the every yaml file of each application
 ```bash
- kubectl apply -f openmrs.yaml   ------Openmrs folder contain openrms.yaml
- kubectl apply -f openelis.yaml  ------Openelis folder contain openrms.yaml
+kubectl apply -f openmrs.yaml   ------Openmrs folder contain openrms.yaml
+kubectl apply -f openelis.yaml  ------Openelis folder contain openrms.yaml
 kubectl apply -f odoo.yaml       ------Odoo folder contain openrms.yaml
 kubectl apply -f dhis2.yaml      ------Dhis2 folder contain openrms.yaml
 
