@@ -26,7 +26,7 @@ spec:
 
       containers:
         - name: gateway
-          image: utsavd/gateway-proxy:latest
+          image: nidan-proxy:latest
           imagePullPolicy: IfNotPresent
 
           ports:
@@ -40,9 +40,6 @@ spec:
               containerPort: 8443
 
           env:
-            - name: GATEWAY_DOMAIN
-              value: "localhost"
-
             - name: GATEWAY_CERT_SANS
               value: ""
 
@@ -53,7 +50,7 @@ spec:
               value: "/api/OpenELIS-Global/"
 
             - name: DASHBOARD_ODOO_URL
-              value: "http://192.168.1.72:8069"
+              value: ""
 
           readinessProbe:
             httpGet:

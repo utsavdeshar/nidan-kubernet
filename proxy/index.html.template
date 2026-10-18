@@ -299,7 +299,7 @@
             if (!odooCard) return;
             const protocol = window.location.protocol;   // http: or https:
             const host = window.location.hostname;       // e.g. 192.168.1.80 or localhost
-            odooCard.href = `${protocol}//${host}:8069`;
+            odooCard.href = `http://${host}:8069`;
     	})();
 
         const services = [
