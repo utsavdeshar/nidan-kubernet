@@ -19,9 +19,8 @@ NidanEHR brings together electronic health records, enterprise resource planning
 | Apache Superset | Analytics and visualization |
 | Apache Kafka | Event streaming and data integration |
 
-Add your architecture image at `docs/nidanehr-kubernetes-architecture.png`:
 
-![NidanEHR K3s architecture](docs/nidanehr-kubernetes-architecture.png)
+![NidanEHR K3s architecture](docs/nidanehr_kubernetes.png)
 
 ## 1. Prerequisites
 
