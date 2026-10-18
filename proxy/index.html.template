@@ -231,7 +231,7 @@
             </a>
 
             <!-- Odoo -->
-            <a href="${DASHBOARD_ODOO_URL}" target="_blank" class="card" id="card-odoo">
+            <a href="#" target="_blank" class="card" id="card-odoo">
                 <div class="status-badge status-checking" id="status-odoo">Checking...</div>
                 <div class="icon">📊</div>
                 <div class="title">ERP & Inventory</div>
@@ -247,7 +247,7 @@
             <!-- Middleware UI -->
             <a href="/cis/dead-letters/index.html" target="_blank" class="card" id="card-cis">
                 <div class="status-badge status-checking" id="status-cis">Checking...</div>
-                <div class="icon">�</div>
+                <div class="icon"> </div>
                 <div class="title">Integration & Error Management</div>
                 <div class="desc"></div>
             </a>
@@ -292,6 +292,16 @@
     </footer>
 
     <script>
+
+	 // ── Dynamically point the Odoo card to the same host the dashboard is served from, port 		8069 ──
+    	(function setOdooUrl() {
+            const odooCard = document.getElementById('card-odoo');
+            if (!odooCard) return;
+            const protocol = window.location.protocol;   // http: or https:
+            const host = window.location.hostname;       // e.g. 192.168.1.80 or localhost
+            odooCard.href = `${protocol}//${host}:8069`;
+    	})();
+
         const services = [
             { id: 'openmrs', url: '/openmrs/spa/config.json' },
             { id: 'openelis', url: '/openelis/' },
