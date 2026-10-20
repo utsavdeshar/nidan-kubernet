@@ -11,7 +11,7 @@ gateway:
   image:
     repository: utsavd/nidan-proxy
     tag: latest
-  replicas: 2
+  replicas: 1
 
 # ============================================================
 # OpenMRS
