@@ -262,6 +262,11 @@ spec:
                 secretKeyRef:
                   name: openmrs-secret
                   key: OPENMRS_DB_PASSWORD
+            - name: OMRS_DB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openmrs-secret
+                  key: OPENMRS_DB_ROOT_PASSWORD
             - name: OMRS_DB_DRIVER_CLASS
               valueFrom:
                 configMapKeyRef:
